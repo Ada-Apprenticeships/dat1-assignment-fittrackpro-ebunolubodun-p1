@@ -8,6 +8,7 @@ JOIN class_schedule cs
     ON c.class_id = cs.class_id
 JOIN staff s
     ON cs.staff_id = s.staff_id
+-- Grouping to ensure each class appears once despite potential multiple schedule entries
 GROUP BY c.class_id;
 
 -- 4.2 
@@ -35,6 +36,7 @@ JOIN class_schedule cs
     ON ca.schedule_id = cs.schedule_id
 JOIN classes c
     ON cs.class_id = c.class_id
+-- Limiting to confirmed registrations to measure actual booking demand
 WHERE ca.attendance_status = 'Registered'
 GROUP BY c.class_id
 ORDER BY registration_count DESC

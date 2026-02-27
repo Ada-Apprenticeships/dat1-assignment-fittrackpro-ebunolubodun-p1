@@ -3,6 +3,7 @@
 
 -- 2.1 
 INSERT INTO payments (amount,payment_date,payment_method,payment_type, member_id) VALUES
+-- Using the current system timestamp to accurately record when the payment was processed
 (50.00,  DATETIME('now'),  'Credit Card'   ,'Monthly membership fee', 11);
 
 -- 2.2 

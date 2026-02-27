@@ -10,17 +10,18 @@ WHERE status = 'Active';
 
 -- 5.2 
 SELECT type AS membership_type, ROUND(AVG(total_time), 2) AS avg_visit_duration_minutes
+-- Using a subquery to calculate individual visit durations before aggregating by membership type
 FROM (
     SELECT m.type, (julianday(check_out_time) - julianday(check_in_time)) * 1440 AS total_time
     FROM attendance a
     JOIN memberships m
         ON a.member_id = m.member_id
 )
-GROUP BY type;
+GROUP BY m.type;
 
 -- 5.3 
 SELECT m.member_id, m.first_name, m.last_name, m.email, ms.end_date
 FROM members m 
 JOIN memberships ms
     ON m.member_id = ms.member_id
-WHERE strftime('%Y', end_date) = '2025'
+WHERE strftime('%Y', ms.end_date) = '2025';

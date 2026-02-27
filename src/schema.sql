@@ -19,138 +19,153 @@ DROP TABLE IF EXISTS locations;
 
 
 CREATE TABLE locations (
-    location_id   INTEGER PRIMARY KEY NOT NULL,
-    name          VARCHAR,
-    address       VARCHAR,
-    phone_number  VARCHAR CHECK (length(phone_number) BETWEEN 12 AND 13),
-    email         VARCHAR,  
-    opening_hours VARCHAR
+    location_id   INTEGER PRIMARY KEY,
+    name          VARCHAR NOT NULL,
+    address       VARCHAR NOT NULL,
+    -- Not UNIQUE: locations may share contact details
+    phone_number  VARCHAR NOT NULL CHECK (length(phone_number) BETWEEN 12 AND 13),
+    email         VARCHAR NOT NULL,  
+    opening_hours VARCHAR NOT NULL
 );
 
 CREATE TABLE members (
-    member_id               INTEGER PRIMARY KEY NOT NULL,
-    first_name              VARCHAR,
-    last_name               VARCHAR,
-    email                   VARCHAR,
-    phone_number            VARCHAR CHECK (length(phone_number) = 12),
-    date_of_birth           DATE CHECK (date_of_birth GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),
-    join_date               DATE CHECK (date_of_birth GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),
-    emergency_contact_name  VARCHAR,
-    emergency_contact_phone VARCHAR
+    member_id               INTEGER PRIMARY KEY,
+    first_name              VARCHAR NOT NULL,
+    last_name               VARCHAR NOT NULL,
+    email                   VARCHAR NOT NULL,
+    phone_number            VARCHAR NOT NULL CHECK (length(phone_number) = 12),
+    date_of_birth           DATE NOT NULL CHECK (DATE(date_of_birth) IS NOT NULL),
+    -- Ensures date format validation in SQLite (which does not enforce DATE type strictly)
+    join_date               DATE NOT NULL
+                            CHECK (
+                                DATE(join_date) IS NOT NULL 
+                                AND DATE(join_date) > DATE(date_of_birth)
+                            ),
+    -- Emergency contact defaults to 'Unknown' to avoid NULL handling in reporting
+    emergency_contact_name  VARCHAR NOT NULL DEFAULT 'Unknown',
+    emergency_contact_phone VARCHAR NOT NULL DEFAULT 'Unknown'
 );
 
 CREATE TABLE staff (
-    staff_id     INTEGER PRIMARY KEY NOT NULL,
-    first_name   VARCHAR,
-    last_name    VARCHAR,
-    email        VARCHAR,
-    phone_number VARCHAR CHECK(length(phone_number) = 12),  
-    position     VARCHAR,
-    hire_date    DATE CHECK (hire_date GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),
+    staff_id     INTEGER PRIMARY KEY,
+    first_name   VARCHAR NOT NULL,
+    last_name    VARCHAR NOT NULL,
+    email        VARCHAR NOT NULL,
+    phone_number VARCHAR NOT NULL CHECK(length(phone_number) = 12),  
+    position     VARCHAR NOT NULL CHECK (position IN ('Trainer', 'Manager', 'Receptionist', 'Maintenance')),
+    hire_date    DATE NOT NULL CHECK (DATE(hire_date) IS NOT NULL),
+    -- Staff may exist before being assigned to a specific location
     location_id  INTEGER,
     FOREIGN KEY (location_id) REFERENCES locations(location_id)
 );
 
 CREATE TABLE equipment (
-    equipment_id          INTEGER PRIMARY KEY NOT NULL,
-    name                  VARCHAR,
-    type                  VARCHAR,
-    purchase_date         DATE CHECK (purchase_date GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),
-    last_maintenance_date DATE CHECK (last_maintenance_date GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),
-    next_maintenance_date DATE CHECK (next_maintenance_date GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),
-    location_id           INTEGER,  
+    equipment_id          INTEGER PRIMARY KEY,
+    name                  VARCHAR NOT NULL,
+    type                  VARCHAR NOT NULL CHECK (type IN ('Cardio', 'Strength')),
+    purchase_date         DATE NOT NULL CHECK (DATE(purchase_date) IS NOT NULL),
+    last_maintenance_date DATE NOT NULL CHECK (DATE(last_maintenance_date) IS NOT NULL),
+    next_maintenance_date DATE NOT NULL CHECK (
+                            DATE(next_maintenance_date) IS NOT NULL
+                            -- Ensures maintenance schedule is forward-moving
+                            AND DATE (last_maintenance_date) <= DATE(next_maintenance_date)
+                            ),
+    location_id           INTEGER NOT NULL,  
     FOREIGN KEY (location_id) REFERENCES locations(location_id)    
 );
 
 CREATE TABLE classes (
-    class_id    INTEGER PRIMARY KEY NOT NULL,
-    name        VARCHAR,
-    description VARCHAR,
-    capacity    INTEGER,
-    duration    INTEGER,
-    location_id INTEGER,
+    class_id    INTEGER PRIMARY KEY,
+    name        VARCHAR NOT NULL,
+    description VARCHAR NOT NULL,
+    capacity    INTEGER NOT NULL,
+    duration    INTEGER NOT NULL,
+    location_id INTEGER NOT NULL,
     FOREIGN KEY (location_id) REFERENCES locations(location_id)
 );
 
 CREATE TABLE class_schedule (
-    schedule_id INTEGER PRIMARY KEY NOT NULL,
-    start_time  DATETIME CHECK (start_time GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9]'),
-    end_time    DATETIME CHECK (end_time GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9]'),
-    class_id    INTEGER,
-    staff_id    INTEGER,
+    schedule_id INTEGER PRIMARY KEY,
+    start_time  DATETIME NOT NULL CHECK (DATETIME(start_time) IS NOT NULL),
+    end_time    DATETIME NOT NULL CHECK (DATETIME(end_time) IS NOT NULL AND (DATETIME(end_time) > DATETIME(start_time))),
+    class_id    INTEGER NOT NULL,
+    staff_id    INTEGER NOT NULL,
     FOREIGN KEY (class_id) REFERENCES classes(class_id),
     FOREIGN KEY (staff_id) REFERENCES staff(staff_id)
 );
 
 CREATE TABLE memberships (
-    membership_id INTEGER PRIMARY KEY NOT NULL,
-    type          VARCHAR,
-    start_date    DATE CHECK (start_date GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),
-    end_date      DATE CHECK (end_date GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),
-    status        VARCHAR,
-    member_id     INTEGER,
+    membership_id INTEGER PRIMARY KEY,
+    type          VARCHAR NOT NULL,
+    start_date    DATE NOT NULL CHECK (DATE(start_date) IS NOT NULL),
+    end_date      DATE NOT NULL CHECK (DATE(end_date) IS NOT NULL),
+    status        VARCHAR NOT NULL CHECK (status IN ('Active', 'Inactive')),
+    member_id     INTEGER NOT NULL,
     FOREIGN KEY (member_id) REFERENCES members(member_id)
 );
 
 CREATE TABLE attendance (
-    attendance_id  INTEGER PRIMARY KEY NOT NULL,
-    check_in_time  DATETIME CHECK (check_in_time GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9]'),
-    check_out_time DATETIME CHECK (check_out_time GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9]'),
-    member_id      INTEGER,
-    location_id    INTEGER,
+    attendance_id  INTEGER PRIMARY KEY,
+    check_in_time  DATETIME NOT NULL CHECK (DATETIME(check_in_time) IS NOT NULL),
+    check_out_time DATETIME
+                   CHECK (
+                        check_out_time IS NULL 
+                        OR DATETIME(check_out_time) IS NOT NULL
+                    ),
+    member_id      INTEGER NOT NULL,
+    location_id    INTEGER NOT NULL,
     FOREIGN KEY (member_id) REFERENCES members(member_id),
     FOREIGN KEY (location_id) REFERENCES locations(location_id)
 );
 
 CREATE TABLE class_attendance (
-    class_attendance_id INTEGER PRIMARY KEY NOT NULL,
-    attendance_status   VARCHAR,
-    schedule_id         INTEGER,
-    member_id           INTEGER,
+    class_attendance_id INTEGER PRIMARY KEY,
+    attendance_status   VARCHAR NOT NULL CHECK (attendance_status IN ('Registered', 'Attended', 'Unattended')),
+    schedule_id         INTEGER NOT NULL,
+    member_id           INTEGER NOT NULL,
     FOREIGN KEY (schedule_id) REFERENCES class_schedule(schedule_id),
     FOREIGN KEY (member_id) REFERENCES members(member_id)
 );
 
 CREATE TABLE payments (
-    payment_id     INTEGER PRIMARY KEY NOT NULL,
-    amount         REAL,
-    payment_date   DATETIME CHECK (payment_date GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9]'),
-    payment_method VARCHAR,
-    payment_type   VARCHAR,
-    member_id      INTEGER,
+    payment_id     INTEGER PRIMARY KEY,
+    amount         REAL NOT NULL CHECK (amount > 0),
+    payment_date   DATETIME NOT NULL CHECK (DATETIME(payment_date) IS NOT NULL),
+    payment_method VARCHAR NOT NULL CHECK (payment_method IN ('Credit Card', 'Bank Transfer', 'PayPal', 'Cash')),
+    payment_type   VARCHAR NOT NULL CHECK (payment_type IN ('Monthly membership fee', 'Day pass')),
+    member_id      INTEGER NOT NULL,
     FOREIGN KEY (member_id) REFERENCES members(member_id)
 );
 
 CREATE TABLE personal_training_sessions (
-    session_id   INTEGER PRIMARY KEY NOT NULL,
-    session_date DATE CHECK (session_date GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),
-    start_time   TIME CHECK (start_time GLOB '[0-2][0-9]:[0-5][0-9]:[0-5][0-9]'),
-    end_time     TIME CHECK (end_time GLOB '[0-2][0-9]:[0-5][0-9]:[0-5][0-9]'),
-    notes        VARCHAR,
-    member_id    INTEGER,
-    staff_id     INTEGER,
+    session_id   INTEGER PRIMARY KEY,
+    session_date DATE NOT NULL CHECK (DATE(session_date) IS NOT NULL),
+    start_time   TIME NOT NULL CHECK (TIME(start_time) IS NOT NULL),
+    end_time     TIME NOT NULL CHECK (TIME(end_time) IS NOT NULL),
+    notes        VARCHAR NOT NULL DEFAULT 'No Notes',
+    member_id    INTEGER NOT NULL,
+    staff_id     INTEGER NOT NULL,
     FOREIGN KEY (member_id) REFERENCES members(member_id),
     FOREIGN KEY (staff_id) REFERENCES staff(staff_id)
-
 );
 
 CREATE TABLE member_health_metrics (
-    metric_id           INTEGER PRIMARY KEY NOT NULL,
-    measurement_date    DATE CHECK (measurement_date GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),
-    weight              REAL,
-    body_fat_percentage REAL,
-    muscle_mass         REAL,
-    bmi                 REAL,
-    member_id           INTEGER,
+    metric_id           INTEGER PRIMARY KEY,
+    measurement_date    DATE NOT NULL CHECK (DATE(measurement_date) IS NOT NULL),
+    weight              REAL NOT NULL,
+    body_fat_percentage REAL NOT NULL,
+    muscle_mass         REAL NOT NULL,
+    bmi                 REAL NOT NULL,
+    member_id           INTEGER NOT NULL,
     FOREIGN KEY (member_id) REFERENCES members(member_id)
 );
 
 CREATE TABLE equipment_maintenance_log (
-    log_id           INTEGER PRIMARY KEY NOT NULL,
-    maintenance_date DATE CHECK (maintenance_date GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),
-    description      VARCHAR,
-    staff_id         INTEGER,
-    equipment_id     INTEGER,
+    log_id           INTEGER PRIMARY KEY,
+    maintenance_date DATE NOT NULL CHECK (DATE(maintenance_date) IS NOT NULL),
+    description      VARCHAR NOT NULL,
+    staff_id         INTEGER NOT NULL,
+    equipment_id     INTEGER NOT NULL,
     FOREIGN KEY (equipment_id) REFERENCES equipment(equipment_id),
     FOREIGN KEY (staff_id) REFERENCES staff(staff_id)
 );

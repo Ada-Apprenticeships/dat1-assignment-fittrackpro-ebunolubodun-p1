@@ -35,6 +35,7 @@ LIMIT 1;
 
 -- 1.6
 SELECT COUNT(*)
+-- Subquery used to first identify qualifying members before counting them for clarity of logic
 FROM (
   SELECT member_id
   FROM class_attendance

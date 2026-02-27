@@ -2,6 +2,7 @@
 .mode column
 
 -- 8.1 
+-- Combining first and last names to present member details in a clear, readable format
 SELECT pts.session_id, CONCAT(m.first_name, ' ', m.last_name) AS member_name, pts.session_date, pts.start_time, pts.end_time
 FROM personal_training_sessions pts
 JOIN members m
